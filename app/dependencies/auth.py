@@ -1,54 +1,34 @@
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.jwt import decode_token
 from app.models.user import User
 
-bearer_scheme = HTTPBearer()
-optional_bearer_scheme = HTTPBearer(auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-def _resolve_user_from_token(token: str | None, db: Session):
-    if not token:
-        return None
-
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token payload")
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    credentials_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+    )
 
     try:
-        user_uuid = UUID(user_id)
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail="Invalid user id in token") from exc
+        payload = decode_token(token)
+        if payload.get("type") != "access":
+            raise credentials_error
+        user_id = payload.get("sub")
+        if not user_id:
+            raise credentials_error
+        parsed_user_id = UUID(user_id)
+    except Exception as exc:
+        raise credentials_error from exc
 
-    user = db.get(User, user_uuid)
+    user = db.get(User, parsed_user_id)
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="User is inactive")
-
+        raise credentials_error
     return user
-
-
-def get_current_user(
-    creds: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-):
-    return _resolve_user_from_token(creds.credentials, db)
-
-
-def get_current_user_optional(
-    creds: HTTPAuthorizationCredentials | None = Depends(optional_bearer_scheme),
-    db: Session = Depends(get_db),
-):
-    if creds is None:
-        return None
-    return _resolve_user_from_token(creds.credentials, db)

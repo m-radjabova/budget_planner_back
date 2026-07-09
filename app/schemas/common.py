@@ -1,31 +1,27 @@
-from datetime import datetime
-import re
+from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
-from email_validator import EmailNotValidError, validate_email
 
 
 class ORMModel(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
-class TimestampedSchema(ORMModel):
+class TimestampMixin(ORMModel):
     id: UUID
     created_at: datetime
+
+
+class TimestampUpdateMixin(TimestampMixin):
     updated_at: datetime
 
 
-LOCAL_EMAIL_PATTERN = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.local$", re.IGNORECASE)
+class AmountMixin(BaseModel):
+    amount: Decimal
 
 
-def validate_app_email(value: str) -> str:
-    normalized = value.strip().lower()
-
-    try:
-        validate_email(normalized, check_deliverability=False)
-        return normalized
-    except EmailNotValidError as exc:
-        if LOCAL_EMAIL_PATTERN.fullmatch(normalized):
-            return normalized
-        raise ValueError(str(exc)) from exc
+class DateFilter(BaseModel):
+    start_date: date | None = None
+    end_date: date | None = None

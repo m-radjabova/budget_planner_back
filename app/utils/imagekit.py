@@ -1,24 +1,36 @@
-from __future__ import annotations
+import base64
 
-from urllib.parse import urlparse
+import requests
+from fastapi import HTTPException, UploadFile, status
 
 from app.core.config import settings
 
 
-def build_imagekit_webp_url(url: str | None, *, width: int, quality: int = 80) -> str | None:
-    if not url:
-        return url
-    if "tr=" in url or not _is_imagekit_url(url):
-        return url
+def upload_avatar_to_imagekit(file: UploadFile) -> str:
+    if not settings.IMAGEKIT_PRIVATE_KEY or not settings.IMAGEKIT_URL_ENDPOINT:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="ImageKit is not configured",
+        )
 
-    separator = "&" if "?" in url else "?"
-    return f"{url}{separator}tr=w-{width},q-{quality},f-webp"
+    file_bytes = file.file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File is empty")
 
+    encoded_key = base64.b64encode(f"{settings.IMAGEKIT_PRIVATE_KEY}:".encode("utf-8")).decode("utf-8")
+    response = requests.post(
+        "https://upload.imagekit.io/api/v1/files/upload",
+        headers={"Authorization": f"Basic {encoded_key}"},
+        data={
+            "file": base64.b64encode(file_bytes).decode("utf-8"),
+            "fileName": file.filename or "avatar.jpg",
+            "folder": "/budget-planner/avatars",
+            "useUniqueFileName": "true",
+        },
+        timeout=30,
+    )
 
-def _is_imagekit_url(url: str) -> bool:
-    endpoint = settings.IMAGEKIT_URL_ENDPOINT
-    if endpoint and url.startswith(endpoint):
-        return True
+    if response.status_code >= 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Avatar upload failed")
 
-    host = urlparse(url).netloc.lower()
-    return host.endswith("imagekit.io")
+    return response.json()["url"]

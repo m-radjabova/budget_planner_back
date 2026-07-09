@@ -1,248 +1,136 @@
-from dotenv import load_dotenv
-
-load_dotenv(override=True)
-
-import os
-from datetime import time
+import uuid
+from datetime import date, timedelta
+from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
-from app.models.enums import UserRole
+from app.models.budget import Budget
+from app.models.category import Category
+from app.models.debt import Debt
+from app.models.enums import DebtStatus, EntryType, NotificationType, RecurringFrequency, UserRole
+from app.models.note import Note
+from app.models.notification import Notification
+from app.models.recurring_transaction import RecurringTransaction
+from app.models.savings_goal import SavingsGoal
+from app.models.transaction import Transaction
 from app.models.user import User
-from app.services.user_service import UserService
+
+DEMO_USER_ID = uuid.UUID("0f9edaeb-76e3-4435-9e4f-be1964417c97")
+DEMO_EMAIL = "demo@budgetplanner.com"
+DEMO_PASSWORD = "demo12345"
 
 
-BARBERS = [
-    {
-        "full_name": "Jamshid Xasanov",
-        "email": "jamshid@gmail.com",
-        "password": "123456",
-        "avatar": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=900&q=80",
-        "specialty": "Skin fade va zamonaviy erkaklar sochi",
-        "bio": "Aniq chiziqlar va toza fade bilan ishlaydi. Tez va tartibli servis beradi.",
-        "location_text": "G‘ijduvon ko‘chasi, Buxoro",
-        "work_start_time": time(9, 0),
-        "work_end_time": time(19, 0),
-        "services": [
-            {"name": "Classic Haircut", "price": 70000, "duration_minutes": 45},
-            {"name": "Beard Styling", "price": 50000, "duration_minutes": 30},
-        ],
-    },
-    {
-        "full_name": "Azizbek Qodirov",
-        "email": "azizbek@gmail.com",
-        "password": "123456",
-        "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80",
-        "specialty": "Mid fade va beard trim",
-        "bio": "Sokin uslubda ishlaydi, beard va haircut kombinatsiyalariga kuchli.",
-        "location_text": "Ibn Sino ko‘chasi, Buxoro",
-        "work_start_time": time(10, 0),
-        "work_end_time": time(20, 0),
-        "services": [
-            {"name": "Fade Cut", "price": 80000, "duration_minutes": 50},
-            {"name": "Haircut + Beard", "price": 110000, "duration_minutes": 70},
-        ],
-    },
-    {
-        "full_name": "Bekzod Rahimov",
-        "email": "bekzod@gmail.com",
-        "password": "123456",
-        "avatar": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=900&q=80",
-        "specialty": "Classic va premium scissors cut",
-        "bio": "Qaychi bilan ishlashni yaxshi ko‘radi. Business style mijozlar uchun mos.",
-        "location_text": "Bahouddin Naqshband ko‘chasi, Buxoro",
-        "work_start_time": time(8, 30),
-        "work_end_time": time(18, 30),
-        "services": [
-            {"name": "Scissors Cut", "price": 90000, "duration_minutes": 60},
-            {"name": "Kids Haircut", "price": 60000, "duration_minutes": 35},
-        ],
-    },
-    {
-        "full_name": "Sardor Tursunov",
-        "email": "sardor@gmail.com",
-        "password": "123456",
-        "avatar": "https://images.unsplash.com/photo-1504257432389-52343af06ae3?auto=format&fit=crop&w=900&q=80",
-        "specialty": "Textured crop va buzz cut",
-        "bio": "Minimalistik va toza uslublarga ixtisoslashgan. Yoshlar orasida ommabop.",
-        "location_text": "Alpomish ko‘chasi, Buxoro",
-        "work_start_time": time(11, 0),
-        "work_end_time": time(21, 0),
-        "services": [
-            {"name": "Buzz Cut", "price": 50000, "duration_minutes": 25},
-            {"name": "Textured Crop", "price": 85000, "duration_minutes": 55},
-        ],
-    },
-    {
-        "full_name": "Doston Ergashev",
-        "email": "doston@gmail.com",
-        "password": "123456",
-        "avatar": "https://images.unsplash.com/photo-1504593811423-6dd665756598?auto=format&fit=crop&w=900&q=80",
-        "specialty": "Hot towel shave va premium parvarish",
-        "bio": "An’anaviy barbering elementlarini zamonaviy servis bilan birlashtiradi.",
-        "location_text": "Mustaqillik ko‘chasi, Buxoro",
-        "work_start_time": time(9, 30),
-        "work_end_time": time(19, 30),
-        "services": [
-            {"name": "Hot Towel Shave", "price": 75000, "duration_minutes": 40},
-            {"name": "Premium Grooming", "price": 120000, "duration_minutes": 75},
-        ],
-    },
-    {
-        "full_name": "Temur Malikov",
-        "email": "temur@gmail.com",
-        "password": "123456",
-        "avatar": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=900&q=80",
-        "specialty": "Low taper va styling",
-        "bio": "Soch turiga qarab individual tavsiya beradi. Styling finishlari kuchli.",
-        "location_text": "Sadriddin Ayni ko‘chasi, Buxoro",
-        "work_start_time": time(10, 30),
-        "work_end_time": time(20, 30),
-        "services": [
-            {"name": "Low Taper", "price": 85000, "duration_minutes": 50},
-            {"name": "Hair Styling", "price": 45000, "duration_minutes": 20},
-        ],
-    },
-    {
-    "full_name": "Zafarbek Yusupov",
-    "email": "zafarbek@gmail.com",
-    "password": "123456",
-    "avatar": "https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?auto=format&fit=crop&w=900&q=80",
-    "specialty": "Modern fade va styling",
-    "bio": "Trend haircut va styling bo‘yicha kuchli. Yoshlar orasida mashhur.",
-    "location_text": "Nodir Devonbegi ko‘chasi, Buxoro",
-    "work_start_time": time(10, 0),
-    "work_end_time": time(20, 0),
-    "services": [
-        {"name": "Modern Fade", "price": 90000, "duration_minutes": 55},
-        {"name": "Hair Styling", "price": 50000, "duration_minutes": 25},
-    ],
-},
-{
-    "full_name": "Sherzod G‘aniyev",
-    "email": "sherzod@gmail.com",
-    "password": "123456",
-    "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80",
-    "specialty": "Classic haircut va shave",
-    "bio": "Oddiy va sifatli xizmat. Har yoshdagi mijozlar uchun mos.",
-    "location_text": "Afrosiyob ko‘chasi, Buxoro",
-    "work_start_time": time(9, 0),
-    "work_end_time": time(18, 0),
-    "services": [
-        {"name": "Classic Cut", "price": 65000, "duration_minutes": 40},
-        {"name": "Clean Shave", "price": 40000, "duration_minutes": 30},
-    ],
-},
-{
-    "full_name": "Bobur Mirzayev",
-    "email": "bobur@gmail.com",
-    "password": "123456",
-    "avatar": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80",
-    "specialty": "Skin fade va beard design",
-    "bio": "Beard dizayn va sharp fade bilan ajralib turadi.",
-    "location_text": "Firdavsiy ko‘chasi, Buxoro",
-    "work_start_time": time(11, 0),
-    "work_end_time": time(21, 0),
-    "services": [
-        {"name": "Skin Fade", "price": 95000, "duration_minutes": 60},
-        {"name": "Beard Design", "price": 60000, "duration_minutes": 35},
-    ],
-},
-{
-    "full_name": "Oybek Raxmatov",
-    "email": "oybek@gmail.com",
-    "password": "123456",
-    "avatar": "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80",
-    "specialty": "Kids va family haircut",
-    "bio": "Bolalar va oilaviy mijozlar bilan ishlashga qulay ustoz.",
-    "location_text": "Galaosiyo ko‘chasi, Buxoro",
-    "work_start_time": time(9, 30),
-    "work_end_time": time(18, 30),
-    "services": [
-        {"name": "Kids Haircut", "price": 50000, "duration_minutes": 30},
-        {"name": "Family Cut", "price": 120000, "duration_minutes": 80},
-    ],
-},
-{
-    "full_name": "Javlonbek Sodiqov",
-    "email": "javlon@gmail.com",
-    "password": "123456",
-    "avatar": "https://images.unsplash.com/photo-1502685104226-ee32379fefbe?auto=format&fit=crop&w=900&q=80",
-    "specialty": "Buzz cut va fast service",
-    "bio": "Tez va arzon xizmat. Minimalistik haircutlarni yaxshi bajaradi.",
-    "location_text": "Kogon yo‘li, Buxoro",
-    "work_start_time": time(8, 0),
-    "work_end_time": time(17, 0),
-    "services": [
-        {"name": "Buzz Cut", "price": 40000, "duration_minutes": 20},
-        {"name": "Quick Trim", "price": 30000, "duration_minutes": 15},
-    ],
-},
-{
-    "full_name": "Sanjarbek To‘xtayev",
-    "email": "sanjar@gmail.com",
-    "password": "123456",
-    "avatar": "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?auto=format&fit=crop&w=900&q=80",
-    "specialty": "Premium grooming va relax servis",
-    "bio": "Mijozga qulaylik va relax muhit yaratishga e’tibor beradi.",
-    "location_text": "Buxoro City markazi",
-    "work_start_time": time(12, 0),
-    "work_end_time": time(22, 0),
-    "services": [
-        {"name": "Premium Grooming", "price": 140000, "duration_minutes": 75},
-        {"name": "Relax Package", "price": 160000, "duration_minutes": 90},
-    ],
-},
-]
+def seed_admin(db):
+    admin = db.scalar(select(User).where(User.email == "admin@budgetplanner.com"))
+    if admin:
+        return
 
-def main() -> None:
+    db.add(
+        User(
+            full_name="Admin User",
+            email="admin@budgetplanner.com",
+            hashed_password=hash_password("admin123"),
+            role=UserRole.ADMIN,
+            currency="USD",
+        )
+    )
+    db.commit()
+
+
+def seed_demo_user(db):
+    demo_user = db.get(User, DEMO_USER_ID)
+    if demo_user is None:
+        demo_user = User(
+            id=DEMO_USER_ID,
+            full_name="Budget Demo User",
+            email=DEMO_EMAIL,
+            hashed_password=hash_password(DEMO_PASSWORD),
+            role=UserRole.USER,
+            currency="USD",
+        )
+        db.add(demo_user)
+        db.commit()
+        db.refresh(demo_user)
+    else:
+        demo_user.full_name = "Budget Demo User"
+        demo_user.email = DEMO_EMAIL
+        demo_user.hashed_password = hash_password(DEMO_PASSWORD)
+        demo_user.role = UserRole.USER
+        demo_user.currency = "USD"
+        db.commit()
+
+    for model in [Notification, RecurringTransaction, Note, Debt, SavingsGoal, Budget, Transaction, Category]:
+        db.execute(delete(model).where(model.user_id == DEMO_USER_ID))
+    db.commit()
+
+    today = date.today()
+    first_day = today.replace(day=1)
+
+    categories = {
+        "Salary": Category(user_id=DEMO_USER_ID, name="Salary", icon="briefcase", color="#22c55e", type=EntryType.INCOME),
+        "Freelance": Category(user_id=DEMO_USER_ID, name="Freelance", icon="sparkles", color="#8b5cf6", type=EntryType.INCOME),
+        "Food": Category(user_id=DEMO_USER_ID, name="Food", icon="utensils", color="#fb923c", type=EntryType.EXPENSE),
+        "Housing": Category(user_id=DEMO_USER_ID, name="Housing", icon="home", color="#4f7cff", type=EntryType.EXPENSE),
+        "Transportation": Category(user_id=DEMO_USER_ID, name="Transportation", icon="car", color="#facc15", type=EntryType.EXPENSE),
+        "Health": Category(user_id=DEMO_USER_ID, name="Health", icon="heart", color="#ef4444", type=EntryType.EXPENSE),
+    }
+    db.add_all(categories.values())
+    db.commit()
+
+    transactions = [
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Salary"].id, title="Monthly Salary", amount=4000, type=EntryType.INCOME, transaction_date=first_day + timedelta(days=1), description="Main monthly salary", tags=["#work", "#salary"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Freelance"].id, title="Freelance Payment", amount=1400, type=EntryType.INCOME, transaction_date=first_day + timedelta(days=5), description="Website project payment", tags=["#work", "#freelance"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Food"].id, title="Groceries", amount=220, type=EntryType.EXPENSE, transaction_date=first_day + timedelta(days=3), description="Family grocery shopping", tags=["#family", "#food"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Food"].id, title="Restaurant Dinner", amount=140, type=EntryType.EXPENSE, transaction_date=first_day + timedelta(days=7), description="Dinner with family", tags=["#family", "#food"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Food"].id, title="Weekly Market", amount=120, type=EntryType.EXPENSE, transaction_date=first_day + timedelta(days=10), description="Fresh food and fruit", tags=["#food", "#health"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Housing"].id, title="Apartment Rent", amount=850, type=EntryType.EXPENSE, transaction_date=first_day + timedelta(days=2), description="Monthly rent", tags=["#family", "#home"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Transportation"].id, title="Fuel", amount=90, type=EntryType.EXPENSE, transaction_date=first_day + timedelta(days=9), description="Car fuel refill", tags=["#travel"]),
+        Transaction(user_id=DEMO_USER_ID, category_id=categories["Health"].id, title="Pharmacy", amount=65, type=EntryType.EXPENSE, transaction_date=first_day + timedelta(days=11), description="Health essentials", tags=["#health"]),
+    ]
+    db.add_all(transactions)
+
+    budgets = [
+        Budget(user_id=DEMO_USER_ID, category_id=categories["Food"].id, month=today.month, year=today.year, limit_amount=500),
+        Budget(user_id=DEMO_USER_ID, category_id=categories["Housing"].id, month=today.month, year=today.year, limit_amount=1000),
+        Budget(user_id=DEMO_USER_ID, category_id=categories["Transportation"].id, month=today.month, year=today.year, limit_amount=300),
+        Budget(user_id=DEMO_USER_ID, category_id=categories["Health"].id, month=today.month, year=today.year, limit_amount=250),
+    ]
+    db.add_all(budgets)
+
+    db.add_all([
+        SavingsGoal(user_id=DEMO_USER_ID, title="Vacation Trip", target_amount=2000, current_amount=1200, deadline=today + timedelta(days=120), icon="sun", color="#8b5cf6"),
+        SavingsGoal(user_id=DEMO_USER_ID, title="Emergency Fund", target_amount=3000, current_amount=1000, deadline=today + timedelta(days=200), icon="shield", color="#22c55e"),
+    ])
+
+    db.add_all([
+        Debt(user_id=DEMO_USER_ID, title="Credit Card", total_amount=2500, paid_amount=1200, minimum_payment=150, due_date=today + timedelta(days=12), status=DebtStatus.ACTIVE),
+        Debt(user_id=DEMO_USER_ID, title="Student Loan", total_amount=6000, paid_amount=3500, minimum_payment=220, due_date=today + timedelta(days=20), status=DebtStatus.ACTIVE),
+    ])
+
+    db.add_all([
+        Note(user_id=DEMO_USER_ID, title="Review insurance plan", content="Check new offer before the 15th.", note_date=today + timedelta(days=5)),
+        Note(user_id=DEMO_USER_ID, title="Plan family trip", content="Compare hotel costs and travel budget.", note_date=today + timedelta(days=9)),
+    ])
+
+    db.add_all([
+        RecurringTransaction(user_id=DEMO_USER_ID, category_id=categories["Salary"].id, title="Monthly Salary", amount=4000, type=EntryType.INCOME, frequency=RecurringFrequency.MONTHLY, start_date=first_day, is_active=True),
+        RecurringTransaction(user_id=DEMO_USER_ID, category_id=categories["Housing"].id, title="Rent", amount=850, type=EntryType.EXPENSE, frequency=RecurringFrequency.MONTHLY, start_date=first_day, is_active=True),
+    ])
+
+    db.add_all([
+        Notification(user_id=DEMO_USER_ID, title="Budget Alert: Food", message="You have used 96% of your Food budget.", type=NotificationType.BUDGET, is_read=False),
+        Notification(user_id=DEMO_USER_ID, title="Welcome back", message="Your demo workspace is ready with budgets, tags, analytics and alerts.", type=NotificationType.SYSTEM, is_read=False),
+    ])
+
+    db.commit()
+    print(f"Demo user seeded: {DEMO_EMAIL} / {DEMO_PASSWORD}")
+
+
+def main():
     db = SessionLocal()
     try:
-        user_service = UserService(db)
-        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-        admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
-        admin_full_name = os.getenv("ADMIN_FULL_NAME", "Admin").strip()
-
-        if admin_email and admin_password:
-            existing_admin = db.query(User).filter(User.email == admin_email).first()
-            if existing_admin:
-                print("Admin allaqachon mavjud")
-            else:
-                user_service.create_admin(admin_full_name, admin_email, admin_password)
-                print("Admin yaratildi")
-        else:
-            print("ADMIN_EMAIL yoki ADMIN_PASSWORD .env ichida topilmadi, admin skip qilindi")
-
-        created_barbers = 0
-        existing_barbers = 0
-        for barber_data in BARBERS:
-            existing_barber = db.query(User).filter(User.email == barber_data["email"]).first()
-            if existing_barber:
-                existing_barber.password_hash = hash_password(barber_data["password"])
-                db.add(existing_barber)
-                db.commit()
-                existing_barbers += 1
-                continue
-
-            barber = user_service._create_user(
-                full_name=barber_data["full_name"],
-                email=barber_data["email"],
-                password=barber_data["password"],
-                role=UserRole.BARBER,
-            )
-            barber.avatar = barber_data["avatar"]
-            barber.specialty = barber_data["specialty"]
-            barber.bio = barber_data["bio"]
-            barber.location_text = barber_data["location_text"]
-            barber.work_start_time = barber_data["work_start_time"]
-            barber.work_end_time = barber_data["work_end_time"]
-            barber.services = barber_data["services"]
-            barber.is_active = True
-            db.add(barber)
-            db.commit()
-            created_barbers += 1
-
-        print(f"{created_barbers} ta barber yaratildi, {existing_barbers} tasi avvaldan bor edi")
+        seed_admin(db)
+        seed_demo_user(db)
     finally:
         db.close()
 

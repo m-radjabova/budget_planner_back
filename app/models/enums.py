@@ -1,37 +1,36 @@
-from enum import Enum
+import enum
 
-from sqlalchemy import Enum as SAEnum
-
-
-def enum_values(enum_cls: type[Enum]) -> list[str]:
-    return [member.value for member in enum_cls]
+from sqlalchemy import Enum
 
 
-def sql_enum(enum_cls: type[Enum], name: str) -> SAEnum:
-    return SAEnum(
-        enum_cls,
-        name=name,
-        values_callable=enum_values,
-        native_enum=True,
-        validate_strings=True,
-    )
-
-
-class UserRole(str, Enum):
-    ADMIN = "admin"
-    BARBER = "barber"
+class UserRole(str, enum.Enum):
     USER = "user"
+    ADMIN = "admin"
 
 
-class BarberApplicationStatus(str, Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
+class EntryType(str, enum.Enum):
+    INCOME = "income"
+    EXPENSE = "expense"
 
 
-class BookingStatus(str, Enum):
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
-    BLOCKED = "blocked"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+class DebtStatus(str, enum.Enum):
+    ACTIVE = "active"
+    PAID = "paid"
+
+
+class RecurringFrequency(str, enum.Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
+class NotificationType(str, enum.Enum):
+    BUDGET = "budget"
+    DEBT = "debt"
+    SAVING = "saving"
+    SYSTEM = "system"
+
+
+def sql_enum(enum_class: type[enum.Enum], name: str) -> Enum:
+    return Enum(enum_class, name=name, values_callable=lambda values: [item.value for item in values])
