@@ -35,7 +35,7 @@ class Settings(BaseModel):
     IMAGEKIT_URL_ENDPOINT: str = os.getenv("IMAGEKIT_URL_ENDPOINT", "").strip().rstrip("/")
     CORS_ORIGINS: list[str] = _get_list_env(
         "CORS_ORIGINS",
-        ["http://localhost:5173", "http://127.0.0.1:5173"],
+        ["http://localhost:5173", "http://127.0.0.1:5173", "https://budget-planner-seven-cyan.vercel.app"],
     )
 
 
