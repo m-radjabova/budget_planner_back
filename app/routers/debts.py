@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.debt import DebtCreate, DebtRead, DebtUpdate
-from app.services.debt_service import create_debt, delete_debt, get_debt, list_debts, update_debt
+from app.schemas.debt import DebtCreate, DebtPaymentCreate, DebtRead, DebtUpdate
+from app.services.debt_service import add_payment, create_debt, delete_debt, get_debt, list_debts, update_debt
 
 router = APIRouter(prefix="/debts", tags=["Debts"])
 
@@ -24,6 +24,16 @@ def create_new_debt(
     current_user: User = Depends(get_current_user),
 ):
     return create_debt(db, current_user, payload)
+
+
+@router.post("/{debt_id}/payments", response_model=DebtRead)
+def create_debt_payment(
+    debt_id: UUID,
+    payload: DebtPaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return add_payment(db, current_user, debt_id, payload.amount)
 
 
 @router.get("/{debt_id}", response_model=DebtRead)

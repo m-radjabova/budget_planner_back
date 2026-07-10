@@ -1,7 +1,7 @@
 from app.schemas.auth import LoginRequest, RefreshTokenRequest, TokenResponse
 from app.schemas.budget import BudgetCreate, BudgetRead, BudgetUpdate
 from app.schemas.category import CategoryCreate, CategoryRead, CategoryUpdate
-from app.schemas.debt import DebtCreate, DebtRead, DebtUpdate
+from app.schemas.debt import DebtCreate, DebtPaymentCreate, DebtRead, DebtUpdate
 from app.schemas.note import NoteCreate, NoteRead, NoteUpdate
 from app.schemas.notification import NotificationCreate, NotificationRead, NotificationUpdate
 from app.schemas.recurring_transaction import (

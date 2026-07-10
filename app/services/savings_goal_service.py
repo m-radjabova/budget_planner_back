@@ -1,10 +1,13 @@
+from decimal import Decimal
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.savings_goal import SavingsGoal
 from app.models.user import User
+from app.schemas.common import quantize_money
 from app.schemas.savings_goal import SavingsGoalCreate, SavingsGoalUpdate
 from app.services.helpers import filter_for_user, get_object_or_404
 
@@ -30,6 +33,20 @@ def update_savings_goal(db: Session, current_user: User, goal_id: UUID, payload:
     goal = get_savings_goal(db, current_user, goal_id)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(goal, field, value)
+    db.commit()
+    db.refresh(goal)
+    return goal
+
+
+def add_deposit(db: Session, current_user: User, goal_id: UUID, amount: Decimal) -> SavingsGoal:
+    goal = get_savings_goal(db, current_user, goal_id)
+    target_amount = quantize_money(goal.target_amount)
+    current_amount = quantize_money(goal.current_amount)
+    deposit_amount = quantize_money(amount)
+    remaining = target_amount - current_amount
+    if deposit_amount > remaining:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Deposit cannot exceed the remaining goal amount.")
+    goal.current_amount = quantize_money(current_amount + deposit_amount)
     db.commit()
     db.refresh(goal)
     return goal
