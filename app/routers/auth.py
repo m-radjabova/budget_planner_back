@@ -5,9 +5,9 @@ from app.core.database import get_db
 from app.core.security import hash_password, verify_password
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.auth import ChangePasswordRequest, LoginRequest, RefreshTokenRequest, TokenResponse
+from app.schemas.auth import ChangePasswordRequest, GoogleLoginRequest, LoginRequest, RefreshTokenRequest, TokenResponse
 from app.schemas.user import UserRead, UserRegister
-from app.services.auth_service import login_user, refresh_user_token, register_user
+from app.services.auth_service import login_user, login_with_google, refresh_user_token, register_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -20,6 +20,11 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return login_user(db, payload)
+
+
+@router.post("/google", response_model=TokenResponse)
+def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
+    return login_with_google(db, payload)
 
 
 @router.post("/refresh", response_model=TokenResponse)

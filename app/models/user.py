@@ -16,6 +16,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(150), nullable=False, unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    firebase_uid: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True, index=True)
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
     role: Mapped[UserRole] = mapped_column(sql_enum(UserRole, "user_role"), nullable=False, default=UserRole.USER)
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="USD", server_default="USD")
